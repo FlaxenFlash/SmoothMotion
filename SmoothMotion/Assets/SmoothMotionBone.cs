@@ -38,6 +38,22 @@ public class SmoothMotionBone : MonoBehaviour
         _frames.Add(CreateFrameInfo());
     }
 
+    public void OverridePosition(List<Vector3> Positions)
+    {
+        if(Positions.Count != _frames.Count)
+        {
+            Debug.LogError("Failed to override bone position, framecount mismatch");
+            return;
+        }
+
+        for(int frame = 0; frame < _frames.Count; frame++)
+        {
+            var frameinfo = _frames[frame];
+            frameinfo.Position = Positions[frame];
+            _frames[frame] = frameinfo;
+        }
+    }
+
     public FrameInfo CreateFrameInfo()
     {
         var frame = new FrameInfo();
