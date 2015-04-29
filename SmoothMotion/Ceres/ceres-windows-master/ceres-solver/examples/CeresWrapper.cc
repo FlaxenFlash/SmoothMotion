@@ -6,6 +6,8 @@
 #include <iostream>
 #include "Collider.h"
 
+using ceres::NumericDiffCostFunction;
+using ceres::CENTRAL;
 using ceres::AutoDiffCostFunction;
 using ceres::CostFunction;
 using ceres::Problem;
@@ -14,51 +16,29 @@ using ceres::Solve;
 using Eigen::Vector3d;
 using namespace std;
 
-
-struct CostFunctor 
-{
-	template <typename T> bool operator()(const T* const x, T* residual) const {
-		residual[0] = T(10.0) - x[0];
-		return true;
-	}
-};
-
-class BasicCollisionResolutionFunction : public ceres::FirstOrderFunction
+class BasicCollisionResolutionFunction
 {
 private:
-	int _parameters;
-	int _positions;
-	int _frames;
-
 	vector<Collider> _colliders;
-	//ToDo: decide wheter bone positions need to be stored in here as vector3ds, finish calling read file, fix write file, test
+
 public:
-	BasicCollisionResolutionFunction(vector<Collider> colliders, int frames, int bones)
+	BasicCollisionResolutionFunction(vector<Collider> colliders)
 	{
 		_colliders = colliders;
-		_positions = frames * bones;
-		_parameters = _positions * 3;
-		_frames = frames;
 	}
 
-	virtual int NumParameters() const { return _parameters; }
-
-	virtual bool Evaluate(const double* parameters, double* cost, double* gradient) const
+	bool operator()(const double* const x, double* residual) const
 	{
 		int parameterIndex = 0;
-		*cost = 0;
 
-		for (int position = 0; position < _positions; position++)
-		{
-			Vector3d bonePosition(parameters[parameterIndex++], parameters[parameterIndex++], parameters[parameterIndex++]);			
+		Vector3d bonePosition(x[0], x[1], x[2]);
 			
-			for (int i = 0; i < _colliders.size(); i++)
-			{
-				auto collider = _colliders[i];
-				auto overlap = collider.IntersectsPlane(bonePosition);
-				*cost += (overlap < 0) ? 0 : overlap;
-			}
-		}		
+		for (int i = 0; i < _colliders.size(); i++)
+		{
+			auto collider = _colliders[i];
+			auto overlap = collider.IntersectsPlane(bonePosition);
+			*residual = (overlap < 0) ? 0 : overlap;
+		}	
 
 		return true;
 	}
@@ -83,13 +63,21 @@ extern"C" __declspec(dllexport) void ReturnTest(int* numbers)
 
 extern"C" __declspec(dllexport) void BasicCollisionAvoidance(vector<Collider> colliders, int frames, int bones, double* parameters)
 {
-	ceres::GradientProblemSolver::Options options;
+	ceres::Solver::Options options;
 	options.minimizer_progress_to_stdout = true;
-	ceres::GradientProblemSolver::Summary summary;
+	ceres::Solver::Summary summary;
 
-	ceres::GradientProblem problem(new BasicCollisionResolutionFunction(colliders, frames, bones));
+	ceres::Problem problem;
+
+	CostFunction *cost_function = new NumericDiffCostFunction<BasicCollisionResolutionFunction, CENTRAL, 1, 3>(
+		new BasicCollisionResolutionFunction(colliders));
+
+	for (int position = 47 * frames; position < 48 * frames; position++)
+	{
+		problem.AddResidualBlock(cost_function, NULL, &parameters[position * 3]);
+	}
 		
-	ceres::Solve(options, problem, parameters, &summary);
+	ceres::Solve(options, &problem, &summary);
 	std::cout << summary.BriefReport() << "\n";
 }
 
