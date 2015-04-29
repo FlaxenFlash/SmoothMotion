@@ -18,9 +18,12 @@
     <ClCompile Include="..\..\ceres-solver\examples\CeresWrapper.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\ceres-solver\examples\Collider.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Vector3.h">
+    <ClInclude Include="..\..\ceres-solver\examples\Collider.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

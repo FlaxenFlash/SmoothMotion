@@ -11,7 +11,7 @@ public:
 
 	Collider();
 	Collider(Vector3d position, Vector3d normal);
-	bool IntersectsPlane(Vector3d point);
+	double IntersectsPlane(Vector3d point);
 	~Collider();
 };
 

@@ -6,50 +6,74 @@ using System.IO;
 public class SmoothMotionAnimator : MonoBehaviour 
 {
     public SmoothMotionController Controller;
-    private List<Vector3> _bonePositions;
     private float _frame;
+    private const string fileExt = ".SMOutput";
 
-	void Start () 
+	private bool _initialised;
+
+
+	void Start()
     {
         _frame = 0;
-        ReadFromFile();
 	}
 
     private void ReadFromFile()
     {
-        _bonePositions = new List<Vector3>();
+        var bonePositions = new List<Vector3>();
 
-        var content = File.ReadAllText(Controller.AnimationFilename);
-        var values = content.Split(new char[] {' '});
+        var content = File.ReadAllText(Controller.AnimationFilename+fileExt);
+        var values = content.Split(' ');
 
-        var frames = Int32.Parse(values[2]);
+        var frames = Int32.Parse(values[0]);
         if (frames != Controller.NumFrames)
         {
-            Debug.LogWarning("Loaded file has a different number of frames from currently selected animation, expect the unexpected");
+            Debug.LogWarning("Loaded file has a different number of frames from currently selected animation, aborting");
+            return;
         }
 
-        for(var i = 4; i< values.Length; i+=3)
+        for(var i = 3; i< values.Length; i+=3)
         {
-            _bonePositions.Add(new Vector3(Parse(values[i-2]), Parse(values[i-1]), Parse(values[i])));
+            bonePositions.Add(new Vector3(Parse(values[i-2]), Parse(values[i-1]), Parse(values[i])));
+        }
+        
+        if(bonePositions.Count/frames != Controller.Bones.Count)
+        {
+            Debug.LogWarning("Loaded file has a different number of bones from currently selected animation, aborting");
+            return;
         }
 
-        if(_bonePositions.Count != Controller.Bones.Count)
+        int position = 0;
+
+        foreach(var bone in Controller.Bones)
         {
-            Debug.LogWarning("Loaded file has a different number of bones from currently selected animation, expect the unexpected");
+			for(var frame = 0; frame < frames; frame++)
+            {
+				bone.OverridePosition(bonePositions[position], frame);
+				position++;
+            }
         }
     }
 
     private float Parse(string value)
     {
-        return float.Parse(value);
+        return (float)double.Parse(value);
     }
 	
     void Update()
     {
-        _frame += Time.deltaTime * Controller.SamplingFPS;
-        foreach (var bone in Controller.Bones)
-        {
-            bone.SetFrame(_frame);
-        }
+		if (Controller == null || !Controller.Initialised)
+			return;
+
+		if (!_initialised)
+		{
+			ReadFromFile();
+			_initialised = true;
+		}
+
+		_frame += Time.deltaTime * Controller.SamplingFPS;
+		foreach (var bone in Controller.Bones)
+		{
+			bone.SetFrame(_frame);
+		}
     }
 }

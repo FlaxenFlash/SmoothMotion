@@ -7,10 +7,19 @@ public class SmoothMotionAnimationExporter : MonoBehaviour
 {
     public SmoothMotionController Controller;
     public List<PlaneCollisionConstraint> Constraints;
+    private const string fileExt = ".SMInput";
+	private bool _initialised;
 
-    void Start()
+    void Update()
     {
-        WriteToFile();
+		if (Controller == null || !Controller.Initialised)
+			return;
+
+		if (!_initialised)
+		{
+			WriteToFile();
+			_initialised = true;
+		}
     }
 
     private void WriteToFile()
@@ -26,7 +35,7 @@ public class SmoothMotionAnimationExporter : MonoBehaviour
         for (var i = 0; i < Constraints.Count; i++)
             output += WriteOutput(Constraints[i]);
 
-        File.WriteAllText(Controller.AnimationFilename, output);
+        File.WriteAllText(Controller.AnimationFilename+fileExt, output);
     }
 
     public string WriteOutput(SmoothMotionBone bone)

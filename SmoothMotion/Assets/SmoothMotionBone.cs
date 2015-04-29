@@ -1,6 +1,5 @@
-﻿using UnityEngine;
-using System.Collections.Generic;
-using Assets;
+﻿using System.Collections.Generic;
+using UnityEngine;
 
 public struct FrameInfo
 {
@@ -38,20 +37,17 @@ public class SmoothMotionBone : MonoBehaviour
         _frames.Add(CreateFrameInfo());
     }
 
-    public void OverridePosition(List<Vector3> Positions)
+    public void OverridePosition(Vector3 position, int frame)
     {
-        if(Positions.Count != _frames.Count)
+        if(frame >= _frames.Count)
         {
-            Debug.LogError("Failed to override bone position, framecount mismatch");
+            Debug.LogError("Failed to override bone position, exceeded framecount");
             return;
         }
 
-        for(int frame = 0; frame < _frames.Count; frame++)
-        {
-            var frameinfo = _frames[frame];
-            frameinfo.Position = Positions[frame];
-            _frames[frame] = frameinfo;
-        }
+        var frameinfo = _frames[frame];
+        frameinfo.Position = position;
+        _frames[frame] = frameinfo;
     }
 
     public FrameInfo CreateFrameInfo()

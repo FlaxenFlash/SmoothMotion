@@ -4,45 +4,40 @@ using UnityEngine;
 
 public class SmoothMotionController : MonoBehaviour 
 {
-    public List<SmoothMotionBone> Bones;
+    public List<SmoothMotionBone> Bones { get; set; }
     public Animation Animator;
     public int SamplingFPS;
     public Transform SkeletonRoot;
     public string AnimationFilename;
-    public int NumFrames;
+    public int NumFrames{get;set;}
+	public bool Initialised { get; set; }
 
 	void Start()
 	{
         Bones = new List<SmoothMotionBone>();
 	    TagBonesDeep(SkeletonRoot);
         GetBonePositions();
+		Initialised = true;
 	}
 
     private void GetBonePositions()
     {
-        float frameTime = 1f / SamplingFPS;
+		float frameTime = 1f / SamplingFPS;
+	    NumFrames = 0;
 
-        foreach (AnimationState state in Animator)
-        {
-            state.speed = 0;
-            state.time = 0;
-            NumFrames = 0;
+		var clip = Animator.clip;
+	    var time = 0f;
+		while (time < clip.length)
+		{
+			clip.SampleAnimation(gameObject, time);
 
-            while (state.time < state.length)
-            {
-                Animator.Sample();
-
-                foreach (var bone in Bones)
-                {
-                    bone.SaveFramePosition();
-                }
-                state.time += frameTime;
-                NumFrames++;
-            }
-
-            //Only want the first animation
-            break;
-        }
+			foreach (var bone in Bones)
+			{
+				bone.SaveFramePosition();
+			}
+			time += frameTime;
+			NumFrames++;
+		}
     }
 
     private void TagBonesDeep(Transform node)

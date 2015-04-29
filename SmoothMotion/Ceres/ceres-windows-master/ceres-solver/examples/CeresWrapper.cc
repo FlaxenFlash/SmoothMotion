@@ -2,6 +2,7 @@
 #include "glog/logging.h"
 #include "Eigen\Dense"
 #include <fstream>
+#include <windows.h>
 #include <iostream>
 #include "Collider.h"
 
@@ -32,37 +33,43 @@ private:
 	vector<Collider> _colliders;
 	//ToDo: decide wheter bone positions need to be stored in here as vector3ds, finish calling read file, fix write file, test
 public:
-	BasicCollisionResolutionFunction(vector<Collider> colliders, vector<Vector3d> bonePositions, int frames)
+	BasicCollisionResolutionFunction(vector<Collider> colliders, int frames, int bones)
 	{
 		_colliders = colliders;
-		_bonePositions = bonePositions;
-		_positions = frames * bonePositions.size();
+		_positions = frames * bones;
 		_parameters = _positions * 3;
 		_frames = frames;
 	}
 
 	virtual int NumParameters() const { return _parameters; }
 
-	virtual bool Evaluate(const double* parameters, double* costs, double* gradient) const
+	virtual bool Evaluate(const double* parameters, double* cost, double* gradient) const
 	{
 		int parameterIndex = 0;
+		*cost = 0;
 
 		for (int position = 0; position < _positions; position++)
 		{
 			Vector3d bonePosition(parameters[parameterIndex++], parameters[parameterIndex++], parameters[parameterIndex++]);			
-
-			costs[position] = 0;
 			
-			for (int i = 0; i < _colliders.size; i++)
+			for (int i = 0; i < _colliders.size(); i++)
 			{
 				auto collider = _colliders[i];
-				costs[position] += collider.IntersectsPlane(bonePosition) ? 100 : 0;
+				auto overlap = collider.IntersectsPlane(bonePosition);
+				*cost += (overlap < 0) ? 0 : overlap;
 			}
 		}		
 
 		return true;
 	}
 };
+
+void ReadFile(string file, vector<Collider> &colliders, vector<double> &positions, int &frames, int &numBones);
+void SaveFile(string filename, vector<double> parameters, int frames);
+void WriteErrorAndExit(string error);
+void ReadInt(ifstream &stream, int &value);
+void ReadDouble(ifstream &stream, double &value);
+void ReadVector3(ifstream &stream, Vector3d &value);
 
 extern"C" __declspec(dllexport) float TestFunction()
 {
@@ -74,11 +81,14 @@ extern"C" __declspec(dllexport) void ReturnTest(int* numbers)
 	numbers[0] = 5;
 }
 
-extern"C" __declspec(dllexport) void BasicCollisionAvoidance(int numParameters, int frames, double* parameters)
+extern"C" __declspec(dllexport) void BasicCollisionAvoidance(vector<Collider> colliders, int frames, int bones, double* parameters)
 {
-	ceres::GradientProblem problem(new BasicCollisionResolutionFunction(numParameters, frames));
 	ceres::GradientProblemSolver::Options options;
+	options.minimizer_progress_to_stdout = true;
 	ceres::GradientProblemSolver::Summary summary;
+
+	ceres::GradientProblem problem(new BasicCollisionResolutionFunction(colliders, frames, bones));
+		
 	ceres::Solve(options, problem, parameters, &summary);
 	std::cout << summary.BriefReport() << "\n";
 }
@@ -87,8 +97,7 @@ int main(int argc, char** argv)
 {
 	google::InitGoogleLogging(argv[0]);
 
-	int numParams = 0;
-	int numParameters = 0;
+	int bones = 0;
 	int frames = 0;
 	vector<double> parameters;
 	vector<Collider> colliders;
@@ -98,48 +107,38 @@ int main(int argc, char** argv)
 	cin >> filename;
 	cout << "\n";
 
-	ReadFile(filename, colliders, parameters);
+	ReadFile(filename, colliders, parameters, frames, bones);
 
-	BasicCollisionAvoidance(numParameters, frames, &parameters[0]);
+	BasicCollisionAvoidance(colliders, frames, bones, &parameters[0]);
 
-	ofstream outputStream(filename, ofstream::out | ofstream::trunc);
-
-	if (!outputStream)
-	{
-		cout << "Failed to reopen file for editing";
-		exit(1);
-	}
-
-	outputStream << numParameters << " " << frames;
-
-	for (int i = 0; i < parameters.size(); i++)
-	{
-		outputStream << " " << parameters[i];
-	}
-
-	outputStream.close();
+	SaveFile(filename, parameters, frames);
 
 	cout << "Success";
+	cin >> filename;
 
 	return 0;
 }
 
-void ReadFile(string file, vector<Collider> colliders, vector<double> positions)
+void ReadFile(string file, vector<Collider> &colliders, vector<double> &positions, int &frames, int &numBones)
 {
-	int numBones, numFrames, numColliders, numParameters, i;
+	char buffer[MAX_PATH];
+	GetCurrentDirectory(MAX_PATH, buffer);
 
-	ifstream inputStream(file, ofstream::in);
+	int numColliders, numParameters, i;
+
+	ifstream inputStream(file+".SMInput", ofstream::in);
 
 	if (!inputStream)
 		WriteErrorAndExit("Failed to open file\n");
 
+	numBones = 0;
 	ReadInt(inputStream, numBones);
-	ReadInt(inputStream, numFrames);
+	ReadInt(inputStream, frames);
 	ReadInt(inputStream, numColliders);
-	numParameters = numBones * numFrames * 3;
+	numParameters = numBones * frames * 3;
 
 	i = 0;
-	positions.reserve(numParameters);
+	positions = vector<double>(numParameters);
 	while(inputStream && i < numParameters)
 	{
 		ReadDouble(inputStream, positions[i]);
@@ -148,10 +147,9 @@ void ReadFile(string file, vector<Collider> colliders, vector<double> positions)
 
 	if (i != numParameters)
 		WriteErrorAndExit("File ended before all bone positions were found");
-	inputStream.close;
 
 	i = 0;
-	colliders.reserve(numColliders);
+	colliders = vector<Collider>(numColliders);
 	while (inputStream && i < numColliders)
 	{
 		ReadVector3(inputStream, colliders[i].PlanePosition);
@@ -160,9 +158,29 @@ void ReadFile(string file, vector<Collider> colliders, vector<double> positions)
 		i++;
 	}
 
-	if (i != numParameters)
+	if (i != numColliders)
 		WriteErrorAndExit("File ended before all colliders were found");
-	inputStream.close;
+	inputStream.close();
+}
+
+void SaveFile(string filename, vector<double> parameters, int frames)
+{
+	ofstream outputStream(filename+".SMOutput", ofstream::out | ofstream::trunc);
+
+	if (!outputStream)
+	{
+		cout << "Failed to open file for saving " + filename + ".SMOutput";
+		exit(1);
+	}
+
+	outputStream << frames;
+
+	for (int i = 0; i < parameters.size(); i++)
+	{
+		outputStream << " " << parameters[i];
+	}
+
+	outputStream.close();
 }
 
 void WriteErrorAndExit(string error)
@@ -180,7 +198,6 @@ void ReadInt(ifstream &stream, int &value)
 
 	stream >> value;
 }
-	
 
 void ReadDouble(ifstream &stream, double &value)
 {
@@ -192,7 +209,7 @@ void ReadDouble(ifstream &stream, double &value)
 
 void ReadVector3(ifstream &stream, Vector3d &value)
 {
-	ReadDouble(stream, value.x);
-	ReadDouble(stream, value.y);
-	ReadDouble(stream, value.z);
+	ReadDouble(stream, value.x());
+	ReadDouble(stream, value.y());
+	ReadDouble(stream, value.z());
 }

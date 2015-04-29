@@ -31,7 +31,7 @@
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v120</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
@@ -151,9 +151,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\ceres-solver\examples\CeresWrapper.cc" />
+    <ClCompile Include="..\..\ceres-solver\examples\Collider.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Vector3.h" />
+    <ClInclude Include="..\..\ceres-solver\examples\Collider.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

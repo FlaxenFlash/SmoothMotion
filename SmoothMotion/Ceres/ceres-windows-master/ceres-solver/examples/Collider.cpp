@@ -12,10 +12,10 @@ Collider::Collider(Vector3d position, Vector3d normal)
 	PlaneNormal = normal;
 }
 
-bool Collider::IntersectsPlane(Vector3d point)
+double Collider::IntersectsPlane(Vector3d point)
 {
 	Vector3d intersectionVector = point - PlanePosition;
-	return intersectionVector.dot(PlaneNormal) < 0;
+	return intersectionVector.dot(PlaneNormal);
 }
 
 Collider::~Collider()
