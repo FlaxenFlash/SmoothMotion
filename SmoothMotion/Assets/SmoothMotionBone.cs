@@ -24,8 +24,8 @@ public class SmoothMotionBone : MonoBehaviour
         var next = _frames[(int)Mathf.Ceil(frame) % _frames.Count];
 
         var lerpFraction = frame%1;
-        transform.localPosition = Vector3.Lerp(previous.Position, next.Position, lerpFraction);
-        transform.localRotation = Quaternion.Lerp(previous.Rotation, next.Rotation, lerpFraction);
+        transform.position = Vector3.Lerp(previous.Position, next.Position, lerpFraction);
+        transform.rotation = Quaternion.Lerp(previous.Rotation, next.Rotation, lerpFraction);
         transform.localScale = Vector3.Lerp(previous.Scale, next.Scale, lerpFraction);
     }
 
@@ -53,9 +53,9 @@ public class SmoothMotionBone : MonoBehaviour
     public FrameInfo CreateFrameInfo()
     {
         var frame = new FrameInfo();
-        frame.Position = transform.localPosition;
+        frame.Position = transform.position;
         frame.Scale = transform.localScale;
-        frame.Rotation = transform.localRotation;
+        frame.Rotation = transform.rotation;
 
         return frame;
     }
