@@ -152,9 +152,15 @@
   <ItemGroup>
     <ClCompile Include="..\..\ceres-solver\examples\CeresWrapper.cc" />
     <ClCompile Include="..\..\ceres-solver\examples\Collider.cpp" />
+    <ClCompile Include="BasicCollisionResolutionFunction.cpp" />
+    <ClCompile Include="MaintainBoneLengthChildren.cpp" />
+    <ClCompile Include="MaintainBoneLengthFunction.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\ceres-solver\examples\Collider.h" />
+    <ClInclude Include="BasicCollisionResolutionFunction.h" />
+    <ClInclude Include="MaintainBoneLengthChildren.h" />
+    <ClInclude Include="MaintainBoneLengthFunction.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

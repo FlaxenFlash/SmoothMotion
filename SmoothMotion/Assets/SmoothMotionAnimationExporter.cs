@@ -26,7 +26,7 @@ public class SmoothMotionAnimationExporter : MonoBehaviour
     {
         var output = "";
 
-        //File format: NumBones, NumFrames, NumColliders, Bone Positions(All frames for each bone), Collider Details (Position, Normal)
+        //File format: NumBones, NumFrames, NumColliders, Bone Positions(All frames for each bone), Collider Details (Position, Normal), Bone Parents
         output += Controller.Bones.Count + " " + Controller.NumFrames + " " + Constraints.Count + " ";
 
         for (var i = 0; i < Controller.Bones.Count; i++)
@@ -34,6 +34,27 @@ public class SmoothMotionAnimationExporter : MonoBehaviour
 
         for (var i = 0; i < Constraints.Count; i++)
             output += WriteOutput(Constraints[i]);
+
+	    foreach (var bone in Controller.Bones)
+	    {  
+			var parentIndex = -1;
+		    if (bone == Controller.Bones[0])
+			    parentIndex = 0;
+		    else
+		    {
+				var parent = bone.transform.parent;
+				parentIndex = Controller.Bones.FindIndex((x) => x.transform == parent);
+		    }
+		    
+			if(parentIndex == -1)
+				Debug.LogError("Failed to find parent of bone " + bone.gameObject.name);
+			else
+			{
+				output += parentIndex + " ";
+			}
+
+
+	    }
 
         File.WriteAllText(Controller.AnimationFilename+fileExt, output);
     }

@@ -1,10 +1,12 @@
 #include "ceres/ceres.h"
 #include "glog/logging.h"
-#include "Eigen\Dense"
 #include <fstream>
 #include <windows.h>
 #include <iostream>
 #include "Collider.h"
+#include "../../win/examples/MaintainBoneLengthFunction.h"
+#include "../../win/examples/BasicCollisionResolutionFunction.h"
+#include "../../win/examples/MaintainBoneLengthChildren.h"
 
 using ceres::NumericDiffCostFunction;
 using ceres::CENTRAL;
@@ -16,69 +18,106 @@ using ceres::Solve;
 using Eigen::Vector3d;
 using namespace std;
 
-class BasicCollisionResolutionFunction
-{
-private:
-	vector<Collider> _colliders;
-
-public:
-	BasicCollisionResolutionFunction(vector<Collider> colliders)
-	{
-		_colliders = colliders;
-	}
-
-	bool operator()(const double* const x, double* residual) const
-	{
-		int parameterIndex = 0;
-
-		Vector3d bonePosition(x[0], x[1], x[2]);
-			
-		for (int i = 0; i < _colliders.size(); i++)
-		{
-			auto collider = _colliders[i];
-			auto overlap = collider.IntersectsPlane(bonePosition);
-			*residual = (overlap < 0) ? 0 : overlap;
-		}	
-
-		return true;
-	}
-};
-
-void ReadFile(string file, vector<Collider> &colliders, vector<double> &positions, int &frames, int &numBones);
+void ReadFile(string file, vector<Collider> &colliders, vector<double> &positions, int &frames, int &numBones, vector<int> &parents);
 void SaveFile(string filename, vector<double> parameters, int frames);
 void WriteErrorAndExit(string error);
 void ReadInt(ifstream &stream, int &value);
 void ReadDouble(ifstream &stream, double &value);
 void ReadVector3(ifstream &stream, Vector3d &value);
 
-extern"C" __declspec(dllexport) float TestFunction()
+void BasicCollisionAvoidance(vector<Collider> colliders, int frames, int bones, double* parameters)
 {
-	return 5;
-}
-
-extern"C" __declspec(dllexport) void ReturnTest(int* numbers)
-{
-	numbers[0] = 5;
-}
-
-extern"C" __declspec(dllexport) void BasicCollisionAvoidance(vector<Collider> colliders, int frames, int bones, double* parameters)
-{
-	ceres::Solver::Options options;
+	Solver::Options options;
+	options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
 	options.minimizer_progress_to_stdout = true;
-	ceres::Solver::Summary summary;
+	Solver::Summary summary;
 
-	ceres::Problem problem;
+	Problem problem;
 
 	CostFunction *cost_function = new NumericDiffCostFunction<BasicCollisionResolutionFunction, CENTRAL, 1, 3>(
 		new BasicCollisionResolutionFunction(colliders));
 
-	for (int position = 47 * frames; position < 48 * frames; position++)
+	for (int position = 0; position < bones * frames; position++)
 	{
 		problem.AddResidualBlock(cost_function, NULL, &parameters[position * 3]);
 	}
 		
-	ceres::Solve(options, &problem, &summary);
-	std::cout << summary.BriefReport() << "\n";
+	Solve(options, &problem, &summary);
+	cout << summary.FullReport() << "\n";
+}
+
+void MaintainBoneLength(vector<Collider> colliders, int frames, int bones, double* parameters, vector<int> parents)
+{
+	Solver::Options options;
+	options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
+	options.minimizer_progress_to_stdout = true;
+	Solver::Summary summary;
+
+	Problem problem;
+
+	for (int bone = 0; bone < bones; bone++)
+	{
+		for (int frame = 0; frame < frames; frame++)
+		{
+			auto position = (bone * frames + frame)*3;
+			auto parentPosition = (parents[bone] * frames + frame)*3;
+			Vector3d bonePosition(parameters[position], parameters[position + 1], parameters[position + 2]);
+			Vector3d parentBonePosition(parameters[parentPosition], parameters[parentPosition + 1], parameters[parentPosition + 2]);
+			auto boneLength = (parentBonePosition - bonePosition).norm();
+
+			CostFunction *cost_function = new NumericDiffCostFunction<MaintainBoneLengthFunction, CENTRAL, 2, 3>(
+				new MaintainBoneLengthFunction(colliders, &parameters[parentPosition], boneLength));
+
+			problem.AddResidualBlock(cost_function, NULL, &parameters[position]);
+		}
+
+	}
+
+	Solve(options, &problem, &summary);
+	cout << summary.FullReport() << "\n";
+}
+
+void MaintainBoneLengthChildrenFunction(vector<Collider> colliders, int frames, int bones, double* parameters, vector<int> parents)
+{
+	Solver::Options options;
+	options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
+	options.minimizer_progress_to_stdout = true;
+	Solver::Summary summary;
+
+	Problem problem;
+
+	for (int bone = 0; bone < bones; bone++)
+	{
+		for (int frame = 0; frame < frames; frame++)
+		{
+			auto position = (bone * frames + frame) * 3;
+			Vector3d bonePosition(parameters[position], parameters[position + 1], parameters[position + 2]);
+
+			vector<double*> childrenPositions;
+			vector<double> boneLengths;
+			for (auto child = 0; child < bones; child++)
+			{
+				if (parents[child] == bone)
+				{
+					auto childPosition = (child*frames + frame) * 3;
+					childrenPositions.push_back(&parameters[childPosition]);
+					childrenPositions.push_back(&parameters[childPosition+1]);
+					childrenPositions.push_back(&parameters[childPosition+2]);
+					Vector3d childBone(parameters[childPosition], parameters[childPosition + 1], parameters[childPosition + 2]);
+					boneLengths.push_back((childBone - bonePosition).norm());
+				}
+			}
+
+			CostFunction *cost_function = new NumericDiffCostFunction<MaintainBoneLengthChildren, CENTRAL, 2, 3>(
+				new MaintainBoneLengthChildren(colliders, childrenPositions, boneLengths));
+
+			problem.AddResidualBlock(cost_function, NULL, &parameters[position]);
+		}
+
+	}
+
+	Solve(options, &problem, &summary);
+	cout << summary.FullReport() << "\n";
 }
 
 int main(int argc, char** argv) 
@@ -89,15 +128,16 @@ int main(int argc, char** argv)
 	int frames = 0;
 	vector<double> parameters;
 	vector<Collider> colliders;
+	vector<int> parents;
 
 	string filename;
 	cout << "Enter file to process: ";
 	cin >> filename;
 	cout << "\n";
 
-	ReadFile(filename, colliders, parameters, frames, bones);
+	ReadFile(filename, colliders, parameters, frames, bones, parents);
 
-	BasicCollisionAvoidance(colliders, frames, bones, &parameters[0]);
+	MaintainBoneLengthChildrenFunction(colliders, frames, bones, &parameters[0], parents);
 
 	SaveFile(filename, parameters, frames);
 
@@ -107,7 +147,7 @@ int main(int argc, char** argv)
 	return 0;
 }
 
-void ReadFile(string file, vector<Collider> &colliders, vector<double> &positions, int &frames, int &numBones)
+void ReadFile(string file, vector<Collider> &colliders, vector<double> &positions, int &frames, int &numBones, vector<int> &parents)
 {
 	char buffer[MAX_PATH];
 	GetCurrentDirectory(MAX_PATH, buffer);
@@ -148,6 +188,17 @@ void ReadFile(string file, vector<Collider> &colliders, vector<double> &position
 
 	if (i != numColliders)
 		WriteErrorAndExit("File ended before all colliders were found");
+
+	i = 0;
+	parents = vector<int>(numBones);
+	while (inputStream && i < numBones)
+	{
+		ReadInt(inputStream, parents[i]);
+		i++;
+	}
+	if (i != numBones)
+		WriteErrorAndExit("File ended before all bone parents were found");
+
 	inputStream.close();
 }
 
