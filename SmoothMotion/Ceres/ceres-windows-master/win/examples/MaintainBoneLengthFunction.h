@@ -8,7 +8,7 @@ class MaintainBoneLengthFunction
 {
 private:
 	std::vector<Collider> _colliders;
-	Vector3d _parentPosition;
+	double* _parentPosition;
 	double _sqBoneLength;
 
 public:

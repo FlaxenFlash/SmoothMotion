@@ -4,7 +4,7 @@ MaintainBoneLengthFunction::MaintainBoneLengthFunction(std::vector<Collider> col
 {
 	_colliders = colliders;
 
-	_parentPosition << parentPosition[0], parentPosition[1], parentPosition[2];
+	_parentPosition = parentPosition;
 	_sqBoneLength = sqBoneLength;
 }
 
@@ -20,7 +20,8 @@ bool MaintainBoneLengthFunction::operator()(const double* const x, double* resid
 		residual[0] = collider.IntersectsPlane(bonePosition);
 	}
 
-	auto boneLength = (_parentPosition - bonePosition).norm();
+	Vector3d parentPosition(_parentPosition[0], _parentPosition[1], _parentPosition[2]);
+	auto boneLength = (parentPosition - bonePosition).norm();
 	auto diff = boneLength - _sqBoneLength;
 	residual[1] = diff;
 

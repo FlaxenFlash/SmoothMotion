@@ -1,16 +1,14 @@
 ﻿#include "MaintainBoneLengthChildren.h"
 
-MaintainBoneLengthChildren::MaintainBoneLengthChildren(std::vector<Collider> colliders, std::vector<double*> childPositions, std::vector<double> sqBoneLengths)
+MaintainBoneLengthChildren::MaintainBoneLengthChildren(std::vector<Collider> colliders, std::vector<double*> childPositions, std::vector<double> sqBoneLengths, int skeletonDepth)
 {
 	_colliders = colliders;
+	
+	_childrenPositions = childPositions;
 
-	_childrenPositions = std::vector<Vector3d>(childPositions.size()/3);
-	auto position = 0;
-	for (auto i = 0; i < _childrenPositions.size(); i++)
-	{
-		_childrenPositions[i] << *childPositions[position++], *childPositions[position++], *childPositions[position++];
-	}
 	_sqBoneLengths = sqBoneLengths;
+
+	_skeletonDepth = skeletonDepth;
 }
 
 bool MaintainBoneLengthChildren::operator()(const double* const x, double* residual) const
@@ -22,16 +20,17 @@ bool MaintainBoneLengthChildren::operator()(const double* const x, double* resid
 	for (int i = 0; i < _colliders.size(); i++)
 	{
 		auto collider = _colliders[i];
-		residual[0] = collider.IntersectsPlane(bonePosition)*100;
+		residual[0] = collider.IntersectsPlane(bonePosition)*1000;
 	}
 
 	residual[1] = 0;
 
 	for (auto i = 0; i < _childrenPositions.size(); i++)
 	{
-		auto boneLength = (_childrenPositions[i] - bonePosition).norm();
+		Vector3d child(_childrenPositions[i][0], _childrenPositions[i][1], _childrenPositions[i][2]);
+		auto boneLength = (child - bonePosition).norm();
 		auto diff = boneLength - _sqBoneLengths[i];
-		residual[1] += diff;
+		residual[1] += diff*_skeletonDepth;
 	}
 
 	return true;

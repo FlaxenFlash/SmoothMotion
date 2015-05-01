@@ -85,31 +85,32 @@ void MaintainBoneLengthChildrenFunction(vector<Collider> colliders, int frames, 
 	Solver::Summary summary;
 
 	Problem problem;
+	vector<int> boneDepths;
 
 	for (int bone = 0; bone < bones; bone++)
-	{
+	{		
+		auto parent = parents[bone];
+		boneDepths.push_back(boneDepths.size() <= parent ? 1 : boneDepths[parent] + 1);
 		for (int frame = 0; frame < frames; frame++)
 		{
 			auto position = (bone * frames + frame) * 3;
 			Vector3d bonePosition(parameters[position], parameters[position + 1], parameters[position + 2]);
 
 			vector<double*> childrenPositions;
-			vector<double> boneLengths;
+			vector<double> boneLengths;			
 			for (auto child = 0; child < bones; child++)
 			{
 				if (parents[child] == bone)
 				{
 					auto childPosition = (child*frames + frame) * 3;
 					childrenPositions.push_back(&parameters[childPosition]);
-					childrenPositions.push_back(&parameters[childPosition+1]);
-					childrenPositions.push_back(&parameters[childPosition+2]);
 					Vector3d childBone(parameters[childPosition], parameters[childPosition + 1], parameters[childPosition + 2]);
 					boneLengths.push_back((childBone - bonePosition).norm());
 				}
 			}
 
 			CostFunction *cost_function = new NumericDiffCostFunction<MaintainBoneLengthChildren, CENTRAL, 2, 3>(
-				new MaintainBoneLengthChildren(colliders, childrenPositions, boneLengths));
+				new MaintainBoneLengthChildren(colliders, childrenPositions, boneLengths, boneDepths[bone]));
 
 			problem.AddResidualBlock(cost_function, NULL, &parameters[position]);
 		}
