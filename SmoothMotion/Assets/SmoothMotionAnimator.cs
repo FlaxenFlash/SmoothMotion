@@ -10,7 +10,7 @@ public class SmoothMotionAnimator : MonoBehaviour
     private const string fileExt = ".SMOutput";
 
 	private bool _initialised;
-
+	public float SlowMotion = 1;
 
 	void Start()
     {
@@ -70,7 +70,7 @@ public class SmoothMotionAnimator : MonoBehaviour
 			_initialised = true;
 		}
 
-		_frame += Time.deltaTime * Controller.SamplingFPS;
+		_frame += Time.deltaTime * Controller.SamplingFPS * SlowMotion;
 		foreach (var bone in Controller.Bones)
 		{
 			bone.SetFrame(_frame);
